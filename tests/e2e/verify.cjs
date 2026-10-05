@@ -100,7 +100,9 @@ async function masuk(page, nama, sandi) {
 
     await a.fill('textarea[aria-label="Tulis pesan"]', 'Pesan khusus teknologi')
     await a.click('button:has-text("Kirim")')
-    await a.waitForTimeout(1200)
+    // Mode cadangan (Vercel) butuh satu putaran polling (~1,5 detik) sebelum
+    // pesan tampil; beri kelonggaran.
+    await a.waitForSelector('text=Pesan khusus teknologi', { timeout: 15000 }).catch(() => {})
     const isiTeknologi2 = await a.textContent('.obrolan-isi')
     cek('Pesan baru muncul di ruang Teknologi', isiTeknologi2.includes('Pesan khusus teknologi'))
 
