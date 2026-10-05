@@ -1,0 +1,22 @@
+# Konfigurasi Render untuk Ngobrol.
+#
+# Ngobrol memakai WebSocket, jadi TIDAK bisa dijalankan di Vercel (serverless).
+# Render menjalankan proses yang tetap hidup — cocok untuk WebSocket.
+#
+# Catatan paket gratis: layanan "tidur" setelah lama tidak dipakai dan bangun
+# lagi saat diakses (perlu beberapa detik). Ruang & riwayat tetap ada selama
+# layanan hidup; ikut ter-reset bila layanan di-deploy ulang, karena paket
+# gratis tidak menyediakan penyimpanan permanen.
+services:
+  - type: web
+    name: ngobrol
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node server/src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
+      - key: AUTH_SECRET
+        generateValue: true

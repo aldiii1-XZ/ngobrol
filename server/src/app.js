@@ -91,7 +91,10 @@ export function createApp(db) {
     })
   })
 
-  app.use((_req, res) => res.status(404).json({ error: 'Alamat tidak dikenal.' }))
+  // Penangan "alamat tidak dikenal" untuk rute API. Sengaja TIDAK memakai
+  // app.use(...) tanpa awalan, karena itu akan menangkap permintaan halaman
+  // tampilan (mis. "/") sebelum penyaji berkas statis dipasang di index.js.
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'Alamat tidak dikenal.' }))
 
   return app
 }

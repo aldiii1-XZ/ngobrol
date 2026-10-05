@@ -1,14 +1,21 @@
 /**
  * Titik masuk server Ngobrol.
  *
- * Menjalankan satu server HTTP yang melayani:
- *   - REST API (Express)  → /api/...
- *   - WebSocket real-time → /ws
+ * Menjalankan SATU server yang melayani:
+ *   - REST API (Express)          → /api/...
+ *   - WebSocket real-time         → /ws
+ *   - Tampilan web (hasil build)  → /  (hanya bila folder dist ada)
  *
- * Port diatur lewat PORT (default 3080).
+ * Karena WebSocket butuh koneksi yang terus terbuka, server ini harus
+ * dijalankan di host yang mendukung proses tetap (mis. Render), bukan di
+ * fungsi serverless Vercel.
+ *
+ * Port diatur lewat PORT (default 3080). Lokasi basis data lewat DB_PATH.
  */
 import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { openDatabase, migrate } from './db.js'
 import { seedDatabase } from './seed.js'
@@ -23,6 +30,17 @@ migrate(db)
 seedDatabase(db)
 
 const app = createApp(db)
+
+// Bila hasil build frontend ada (folder dist), sajikan sebagai berkas statis
+// dengan fallback ke index.html agar alamat seperti "/" tetap bekerja.
+const DIST = fileURLToPath(new URL('../../dist', import.meta.url))
+if (existsSync(DIST)) {
+  const { default: express } = await import('express')
+  app.use(express.static(DIST))
+  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(DIST, 'index.html')))
+  console.log('Tampilan web disajikan dari', DIST)
+}
+
 const server = createServer(app)
 pasangWebSocket(server, db)
 
