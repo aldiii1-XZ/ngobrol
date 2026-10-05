@@ -73,7 +73,7 @@ export function MasukDaftar() {
         <p className="petunjuk">
           <strong>Akun contoh:</strong><br />
           aldi / aldi12345<br />
-          rina / rina12345
+          irene / irene12345
         </p>
       </div>
     </div>

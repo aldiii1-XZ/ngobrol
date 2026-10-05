@@ -5,7 +5,7 @@ import { jam, tanggal, bedaHari, inisial, warnaAvatar, singkat, gabungPesan } fr
 describe('inisial', () => {
   it('mengambil 2 huruf dari nama', () => {
     expect(inisial('aldi')).toBe('AL')
-    expect(inisial('rina putri')).toBe('RP')
+    expect(inisial('irene putri')).toBe('IP')
   })
   it('aman untuk nama kosong', () => {
     expect(inisial('')).toBe('?')
@@ -17,7 +17,7 @@ describe('warnaAvatar', () => {
     expect(warnaAvatar('aldi')).toBe(warnaAvatar('aldi'))
   })
   it('memberi warna yang berbeda untuk nama berbeda', () => {
-    const warna = new Set(['aldi', 'rina', 'budi', 'citra'].map(warnaAvatar))
+    const warna = new Set(['aldi', 'irene', 'budi', 'citra'].map(warnaAvatar))
     expect(warna.size).toBeGreaterThan(1)
   })
 })

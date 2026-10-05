@@ -50,7 +50,7 @@ test('peserta yang bergabung menerima riwayat & daftar online', () => {
 test('pesan tersiarkan ke SEMUA peserta ruang, termasuk pengirim', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'umum')
   a.bersihkan()
@@ -97,7 +97,7 @@ test('riwayat bertahan & urut lama ke baru', () => {
   assert.deepEqual(riwayat.map(m => m.body), ['pertama', 'kedua', 'ketiga'])
 
   // Peserta baru tetap melihat riwayatnya.
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(b, 'umum')
   assert.equal(b.terakhir('riwayat').pesan.length, 3)
 })
@@ -105,19 +105,19 @@ test('riwayat bertahan & urut lama ke baru', () => {
 test('daftar online menampilkan nama unik yang terurut', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   const c = koneksiPalsu(3, 'budi')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'umum')
   hub.gabung(c, 'umum')
 
-  assert.deepEqual(a.terakhir('online').users, ['aldi', 'budi', 'rina'])
+  assert.deepEqual(a.terakhir('online').users, ['aldi', 'budi', 'irene'])
 })
 
 test('peserta keluar: daftar online & pemberitahuan diperbarui', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'umum')
   b.bersihkan()
@@ -125,13 +125,13 @@ test('peserta keluar: daftar online & pemberitahuan diperbarui', () => {
   hub.keluarRuangan(a)
   assert.equal(hub.jumlahPeserta('umum'), 1)
   assert.equal(b.terakhir('keluar')?.username, 'aldi')
-  assert.deepEqual(b.terakhir('online')?.users, ['rina'])
+  assert.deepEqual(b.terakhir('online')?.users, ['irene'])
 })
 
 test('indikator "sedang menulis" hanya ke peserta lain', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'umum')
   a.bersihkan(); b.bersihkan()
@@ -148,7 +148,7 @@ test('indikator "sedang menulis" hanya ke peserta lain', () => {
 test('mengirim pesan otomatis menghentikan indikator menulis', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'umum')
   b.bersihkan()
@@ -173,7 +173,7 @@ test('berpindah ruang: keluar dari ruang lama, masuk ruang baru', () => {
 test('pesan di ruang terpisah tidak saling bocor', () => {
   const { hub } = siapkan()
   const a = koneksiPalsu(1, 'aldi')
-  const b = koneksiPalsu(2, 'rina')
+  const b = koneksiPalsu(2, 'irene')
   hub.gabung(a, 'umum')
   hub.gabung(b, 'teknologi')
   b.bersihkan()

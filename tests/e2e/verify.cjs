@@ -42,8 +42,8 @@ async function masuk(page, nama, sandi) {
     await masuk(a, 'aldi', 'aldi12345')
     cek('Browser A masuk sebagai aldi', true)
 
-    await masuk(b, 'rina', 'rina12345')
-    cek('Browser B masuk sebagai rina', true)
+    await masuk(b, 'irene', 'irene12345')
+    cek('Browser B masuk sebagai irene', true)
 
     // ── 2. Daftar ruang tampil ─────────────────────────────────────────────
     const jumlahRuang = await a.locator('.ruang-tombol').count()
@@ -59,7 +59,7 @@ async function masuk(page, nama, sandi) {
     // ── 4. INTI: pesan dari A muncul di B tanpa refresh ────────────────────
     // Teks unik tiap run agar tidak bentrok dengan riwayat uji sebelumnya.
     const cap = Date.now()
-    const teksUji = `Halo Rina, ini uji real-time ${cap}!`
+    const teksUji = `Halo Irene, ini uji real-time ${cap}!`
     await a.fill('textarea[aria-label="Tulis pesan"]', teksUji)
     await a.click('button:has-text("Kirim")')
 
@@ -84,13 +84,13 @@ async function masuk(page, nama, sandi) {
     await b.fill('textarea[aria-label="Tulis pesan"]', 'sedang mengetik')
     await a.waitForSelector('text=sedang menulis', { timeout: 15000 })
     const teksMenulis = await a.textContent('.menulis-baris')
-    cek('Indikator "rina sedang menulis" muncul di A', teksMenulis.includes('rina'))
+    cek('Indikator "irene sedang menulis" muncul di A', teksMenulis.includes('irene'))
 
     // Setelah B mengirim, indikator hilang (mode cadangan perlu waktu poll).
     await b.click('button:has-text("Kirim")')
     await a.waitForTimeout(3500)
     const menulisSetelah = await a.textContent('.menulis-baris')
-    cek('Indikator menulis hilang setelah pesan terkirim', !menulisSetelah.includes('rina'))
+    cek('Indikator menulis hilang setelah pesan terkirim', !menulisSetelah.includes('irene'))
 
     // ── 7. Berganti ruang: pesan tidak bocor antar ruang ───────────────────
     await a.click('.ruang-tombol:has-text("Teknologi")')

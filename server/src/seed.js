@@ -23,6 +23,6 @@ export function seedDatabase(db) {
   if (jumlahUser === 0) {
     const ins = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
     ins.run('aldi', hashPassword('aldi12345'))
-    ins.run('rina', hashPassword('rina12345'))
+    ins.run('irene', hashPassword('irene12345'))
   }
 }

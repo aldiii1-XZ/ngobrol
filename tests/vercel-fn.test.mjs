@@ -62,7 +62,7 @@ const kirim = await panggil('POST', '/api/rooms/umum/messages', {
 })
 cek('kirim pesan lewat REST berhasil', kirim.status === 201 && kirim.data?.message?.body === 'Halo dari fungsi serverless!')
 
-const masukB = await panggil('POST', '/api/auth/login', { body: { username: 'rina', password: 'rina12345' } })
+const masukB = await panggil('POST', '/api/auth/login', { body: { username: 'irene', password: 'irene12345' } })
 const pollB = await panggil('POST', '/api/rooms/umum/poll', { token: masukB.data.token, body: { since: 0 } })
 cek('pengguna lain membaca pesan lewat poll', pollB.status === 200 && pollB.data?.messages?.length === 1)
 // Catatan: daftar online TIDAK diuji di sini. Pada fungsi serverless lokal

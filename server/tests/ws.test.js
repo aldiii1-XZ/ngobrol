@@ -32,10 +32,10 @@ async function siapkan() {
   const wsBase = `ws://127.0.0.1:${port}`
 
   const aldiId = db.prepare('SELECT id FROM users WHERE username = ?').get('aldi').id
-  const rinaId = db.prepare('SELECT id FROM users WHERE username = ?').get('rina').id
+  const ireneId = db.prepare('SELECT id FROM users WHERE username = ?').get('irene').id
 
   return {
-    db, base, wsBase, aldiId, rinaId,
+    db, base, wsBase, aldiId, ireneId,
     async tutup() {
       await new Promise(r => server.close(r))
       db.close()
@@ -85,19 +85,19 @@ test('WebSocket: pesan sampai seketika ke klien lain', async (t) => {
   t.after(() => s.tutup())
 
   const tokenA = buatToken(s.aldiId)
-  const tokenB = buatToken(s.rinaId)
+  const tokenB = buatToken(s.ireneId)
   const a = klien(s.wsBase, tokenA)
   const b = klien(s.wsBase, tokenB)
   await Promise.all([a.siap(), b.siap()])
 
   // Keduanya menerima identitas saat tersambung.
   assert.equal((await a.tungguPesan(p => p.tipe === 'siap')).username, 'aldi')
-  assert.equal((await b.tungguPesan(p => p.tipe === 'siap')).username, 'rina')
+  assert.equal((await b.tungguPesan(p => p.tipe === 'siap')).username, 'irene')
 
   a.kirim({ tipe: 'gabung', room: 'umum' })
   b.kirim({ tipe: 'gabung', room: 'umum' })
   await a.tungguPesan(p => p.tipe === 'online' && p.users.includes('aldi'))
-  await b.tungguPesan(p => p.tipe === 'online' && p.users.includes('rina'))
+  await b.tungguPesan(p => p.tipe === 'online' && p.users.includes('irene'))
 
   // A mengirim pesan; B harus menerimanya tanpa diminta.
   a.kirim({ tipe: 'pesan', body: 'Halo dari tes!' })
@@ -113,7 +113,7 @@ test('WebSocket: indikator menulis sampai ke peserta lain saja', async (t) => {
   t.after(() => s.tutup())
 
   const a = klien(s.wsBase, buatToken(s.aldiId))
-  const b = klien(s.wsBase, buatToken(s.rinaId))
+  const b = klien(s.wsBase, buatToken(s.ireneId))
   await Promise.all([a.siap(), b.siap()])
   a.kirim({ tipe: 'gabung', room: 'umum' })
   b.kirim({ tipe: 'gabung', room: 'umum' })

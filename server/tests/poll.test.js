@@ -71,7 +71,7 @@ test('poll: pesan dari satu pengguna terbaca pengguna lain', async (t) => {
   t.after(() => s.tutup())
 
   const tokenA = await s.masuk('aldi', 'aldi12345')
-  const tokenB = await s.masuk('rina', 'rina12345')
+  const tokenB = await s.masuk('irene', 'irene12345')
 
   // A kirim pesan lewat REST.
   const kirim = await s.req('POST', '/api/rooms/umum/messages', { token: tokenA, body: { body: 'Halo lewat REST!' } })
@@ -113,13 +113,13 @@ test('poll: daftar online terisi & tidak mencampur ruang', async (t) => {
   t.after(() => s.tutup())
 
   const tokenA = await s.masuk('aldi', 'aldi12345')
-  const tokenB = await s.masuk('rina', 'rina12345')
+  const tokenB = await s.masuk('irene', 'irene12345')
 
   await s.poll('umum', 0, tokenA)
   const pollB = await s.poll('umum', 0, tokenB)
-  assert.deepEqual(pollB.data.online, ['aldi', 'rina'])
+  assert.deepEqual(pollB.data.online, ['aldi', 'irene'])
 
-  // Rina pindah ke ruang Teknologi → di Umum tinggal aldi.
+  // Irene pindah ke ruang Teknologi → di Umum tinggal aldi.
   await s.poll('teknologi', 0, tokenB)
   const pollLagi = await s.poll('umum', 0, tokenA)
   assert.deepEqual(pollLagi.data.online, ['aldi'])
@@ -130,7 +130,7 @@ test('poll: indikator "sedang menulis" hanya terlihat oleh orang lain', async (t
   t.after(() => s.tutup())
 
   const tokenA = await s.masuk('aldi', 'aldi12345')
-  const tokenB = await s.masuk('rina', 'rina12345')
+  const tokenB = await s.masuk('irene', 'irene12345')
 
   await s.req('POST', '/api/rooms/umum/typing', { token: tokenA })
 
