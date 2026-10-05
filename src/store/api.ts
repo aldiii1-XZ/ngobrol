@@ -58,9 +58,10 @@ export const api = {
     ),
 
   // Mode cadangan (polling) — dipakai bila WebSocket tidak tersedia.
+  // Memakai POST karena sekaligus memperbarui kehadiran (lihat server/src/app.js).
   poll: (slug: string, since: number) =>
     panggil<{ messages: ChatMessage[]; online: string[]; typing: string[] }>(
-      'GET', `/api/rooms/${slug}/poll?since=${since}`,
+      'POST', `/api/rooms/${slug}/poll`, { since },
     ),
   kirimLewatRest: (slug: string, body: string) =>
     panggil<{ message: ChatMessage }>('POST', `/api/rooms/${slug}/messages`, { body }),

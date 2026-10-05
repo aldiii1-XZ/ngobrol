@@ -133,12 +133,18 @@ export function createApp(db, opsi = {}) {
     return [...new Set(baris.map(b => b.username))].sort()
   }
 
-  /** Mengambil pesan baru sejak id tertentu (untuk polling). */
-  app.get('/api/rooms/:slug/poll', wajibMasuk, (req, res) => {
+  /**
+   * Mengambil pesan baru sejak id tertentu (untuk polling).
+   * Sengaja memakai POST — bukan GET — karena permintaan ini juga MENULIS
+   * kehadiran pengguna ("sedang online"). Pada host serverless, hanya
+   * permintaan yang mengubah data yang disimpan ke penyimpanan bersama; bila
+   * memakai GET, daftar online tidak akan bertahan antar-permintaan.
+   */
+  app.post('/api/rooms/:slug/poll', wajibMasuk, (req, res) => {
     const room = db.prepare('SELECT id, slug FROM rooms WHERE slug = ?').get(req.params.slug)
     if (!room) return res.status(404).json({ error: 'Ruang tidak ditemukan.' })
 
-    const sejak = Number(req.query.since ?? 0) || 0
+    const sejak = Number(req.query.since ?? req.body?.since ?? 0) || 0
     catatHadir(req.user.id, req.user.username, room.slug)
     bersihkanHadir()
 

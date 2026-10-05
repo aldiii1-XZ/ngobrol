@@ -48,8 +48,16 @@ async function siapkan() {
     return { status: res.status, data: await res.json().catch(() => null) }
   }
 
+  /**
+   * Melakukan polling. Memakai POST (bukan GET) karena polling juga menulis
+   * kehadiran pengguna — lihat catatan di server/src/app.js.
+   */
+  function poll(slug, since, token) {
+    return req('POST', `/api/rooms/${slug}/poll`, { token, body: { since } })
+  }
+
   return {
-    db, base, masuk, req,
+    db, base, masuk, req, poll,
     async tutup() {
       await new Promise(r => server.close(r))
       db.close()
@@ -71,10 +79,10 @@ test('poll: pesan dari satu pengguna terbaca pengguna lain', async (t) => {
   assert.equal(kirim.data.message.username, 'aldi')
 
   // B melakukan polling; harus melihat pesan itu.
-  const poll = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenB })
-  assert.equal(poll.status, 200)
-  assert.equal(poll.data.messages.length, 1)
-  assert.equal(poll.data.messages[0].body, 'Halo lewat REST!')
+  const p = await s.poll('umum', 0, tokenB)
+  assert.equal(p.status, 200)
+  assert.equal(p.data.messages.length, 1)
+  assert.equal(p.data.messages[0].body, 'Halo lewat REST!')
 })
 
 test('poll: hanya pesan BARU yang diambil (sejak id tertentu)', async (t) => {
@@ -85,17 +93,17 @@ test('poll: hanya pesan BARU yang diambil (sejak id tertentu)', async (t) => {
   await s.req('POST', '/api/rooms/umum/messages', { token: tokenA, body: { body: 'pertama' } })
   await s.req('POST', '/api/rooms/umum/messages', { token: tokenA, body: { body: 'kedua' } })
 
-  const semua = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenA })
+  const semua = await s.poll('umum', 0, tokenA)
   assert.equal(semua.data.messages.length, 2)
   const idTerakhir = semua.data.messages[1].id
 
   // Polling dari id terakhir → tidak ada pesan baru.
-  const kosong = await s.req('GET', `/api/rooms/umum/poll?since=${idTerakhir}`, { token: tokenA })
+  const kosong = await s.poll('umum', idTerakhir, tokenA)
   assert.equal(kosong.data.messages.length, 0)
 
   // Pesan baru muncul setelah dikirim.
   await s.req('POST', '/api/rooms/umum/messages', { token: tokenA, body: { body: 'ketiga' } })
-  const lagi = await s.req('GET', `/api/rooms/umum/poll?since=${idTerakhir}`, { token: tokenA })
+  const lagi = await s.poll('umum', idTerakhir, tokenA)
   assert.equal(lagi.data.messages.length, 1)
   assert.equal(lagi.data.messages[0].body, 'ketiga')
 })
@@ -107,13 +115,13 @@ test('poll: daftar online terisi & tidak mencampur ruang', async (t) => {
   const tokenA = await s.masuk('aldi', 'aldi12345')
   const tokenB = await s.masuk('rina', 'rina12345')
 
-  await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenA })
-  const pollB = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenB })
+  await s.poll('umum', 0, tokenA)
+  const pollB = await s.poll('umum', 0, tokenB)
   assert.deepEqual(pollB.data.online, ['aldi', 'rina'])
 
   // Rina pindah ke ruang Teknologi → di Umum tinggal aldi.
-  await s.req('GET', '/api/rooms/teknologi/poll?since=0', { token: tokenB })
-  const pollLagi = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenA })
+  await s.poll('teknologi', 0, tokenB)
+  const pollLagi = await s.poll('umum', 0, tokenA)
   assert.deepEqual(pollLagi.data.online, ['aldi'])
 })
 
@@ -126,16 +134,16 @@ test('poll: indikator "sedang menulis" hanya terlihat oleh orang lain', async (t
 
   await s.req('POST', '/api/rooms/umum/typing', { token: tokenA })
 
-  const pollB = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenB })
+  const pollB = await s.poll('umum', 0, tokenB)
   assert.deepEqual(pollB.data.typing, ['aldi'])
 
   // Pengirim tidak melihat indikatornya sendiri.
-  const pollA = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenA })
+  const pollA = await s.poll('umum', 0, tokenA)
   assert.deepEqual(pollA.data.typing, [])
 
   // Setelah mengirim pesan, indikator hilang.
   await s.req('POST', '/api/rooms/umum/messages', { token: tokenA, body: { body: 'sudah kirim' } })
-  const pollB2 = await s.req('GET', '/api/rooms/umum/poll?since=0', { token: tokenB })
+  const pollB2 = await s.poll('umum', 0, tokenB)
   assert.deepEqual(pollB2.data.typing, [])
 })
 
@@ -143,7 +151,7 @@ test('poll & kirim butuh masuk', async (t) => {
   const s = await siapkan()
   t.after(() => s.tutup())
 
-  const poll = await s.req('GET', '/api/rooms/umum/poll?since=0')
+  const poll = await s.poll('umum', 0, null)
   assert.equal(poll.status, 401)
 
   const kirim = await s.req('POST', '/api/rooms/umum/messages', { body: { body: 'tanpa token' } })

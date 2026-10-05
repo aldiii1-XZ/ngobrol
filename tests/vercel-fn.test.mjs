@@ -53,7 +53,7 @@ cek('daftar ruang terisi', ruang.status === 200 && ruang.data?.rooms?.length ===
 const masukA = await panggil('POST', '/api/auth/login', { body: { username: 'aldi', password: 'aldi12345' } })
 cek('masuk berhasil', masukA.status === 200 && Boolean(masukA.data?.token))
 
-const tanpaToken = await panggil('GET', '/api/rooms/umum/poll?since=0')
+const tanpaToken = await panggil('POST', '/api/rooms/umum/poll', { body: { since: 0 } })
 cek('poll butuh login (401)', tanpaToken.status === 401)
 
 // Kirim pesan lewat REST, lalu baca lewat poll (inti mode cadangan).
@@ -63,7 +63,7 @@ const kirim = await panggil('POST', '/api/rooms/umum/messages', {
 cek('kirim pesan lewat REST berhasil', kirim.status === 201 && kirim.data?.message?.body === 'Halo dari fungsi serverless!')
 
 const masukB = await panggil('POST', '/api/auth/login', { body: { username: 'rina', password: 'rina12345' } })
-const pollB = await panggil('GET', '/api/rooms/umum/poll?since=0', { token: masukB.data.token })
+const pollB = await panggil('POST', '/api/rooms/umum/poll', { token: masukB.data.token, body: { since: 0 } })
 cek('pengguna lain membaca pesan lewat poll', pollB.status === 200 && pollB.data?.messages?.length === 1)
 // Catatan: daftar online TIDAK diuji di sini. Pada fungsi serverless lokal
 // (tanpa Blob) tiap permintaan memakai basis data berbeda, jadi kehadiran
@@ -73,7 +73,7 @@ cek('bentuk respons poll lengkap', Array.isArray(pollB.data?.online) && Array.is
 
 const typing = await panggil('POST', '/api/rooms/umum/typing', { token: masukA.data.token })
 cek('tanda "sedang menulis" diterima', typing.status === 200)
-const pollMenulis = await panggil('GET', '/api/rooms/umum/poll?since=0', { token: masukB.data.token })
+const pollMenulis = await panggil('POST', '/api/rooms/umum/poll', { token: masukB.data.token, body: { since: 0 } })
 cek('indikator menulis terbaca pengguna lain', pollMenulis.data?.typing?.includes('aldi'))
 
 const takDikenal = await panggil('GET', '/api/tidak-ada')
