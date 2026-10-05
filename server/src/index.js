@@ -29,7 +29,7 @@ const db = openDatabase(DB_PATH)
 migrate(db)
 seedDatabase(db)
 
-const app = createApp(db)
+const app = createApp(db, { ws: process.env.NGOBROL_TANPA_WS !== '1' })
 
 // Bila hasil build frontend ada (folder dist), sajikan sebagai berkas statis
 // dengan fallback ke index.html agar alamat seperti "/" tetap bekerja.
@@ -42,7 +42,13 @@ if (existsSync(DIST)) {
 }
 
 const server = createServer(app)
-pasangWebSocket(server, db)
+// NGOBROL_TANPA_WS=1 mematikan WebSocket — dipakai untuk MENGUJI mode cadangan
+// secara lokal (meniru host serverless seperti Vercel).
+if (process.env.NGOBROL_TANPA_WS === '1') {
+  console.log('WebSocket DIMATIKAN (mode cadangan/polling) — untuk pengujian')
+} else {
+  pasangWebSocket(server, db)
+}
 
 server.listen(PORT, () => {
   console.log(`Ngobrol berjalan di http://localhost:${PORT} (REST + WebSocket /ws)`)

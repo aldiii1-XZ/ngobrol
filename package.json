@@ -16,6 +16,7 @@
     "server": "node server/src/index.js"
   },
   "dependencies": {
+    "@vercel/blob": "^2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "react": "^18.3.1",

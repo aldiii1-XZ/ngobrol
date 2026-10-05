@@ -86,9 +86,9 @@ async function masuk(page, nama, sandi) {
     const teksMenulis = await a.textContent('.menulis-baris')
     cek('Indikator "rina sedang menulis" muncul di A', teksMenulis.includes('rina'))
 
-    // Setelah B mengirim, indikator hilang.
+    // Setelah B mengirim, indikator hilang (mode cadangan perlu waktu poll).
     await b.click('button:has-text("Kirim")')
-    await a.waitForTimeout(1200)
+    await a.waitForTimeout(3500)
     const menulisSetelah = await a.textContent('.menulis-baris')
     cek('Indikator menulis hilang setelah pesan terkirim', !menulisSetelah.includes('rina'))
 

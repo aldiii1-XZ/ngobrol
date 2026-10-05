@@ -47,6 +47,19 @@ export function migrate(db) {
       created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Kehadiran & "sedang menulis" untuk MODE CADANGAN (polling) di host yang
+    -- tidak mendukung WebSocket (mis. Vercel). Di mode WebSocket, keduanya
+    -- hanya hidup di memori server (hub.js) dan tabel ini tidak dipakai.
+    CREATE TABLE IF NOT EXISTS presence (
+      user_id      INTEGER NOT NULL,
+      room_slug    TEXT    NOT NULL,
+      username     TEXT    NOT NULL,
+      last_seen    INTEGER NOT NULL,
+      typing_until INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, room_slug)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id, id);
+    CREATE INDEX IF NOT EXISTS idx_presence_room ON presence(room_slug, last_seen);
   `)
 }

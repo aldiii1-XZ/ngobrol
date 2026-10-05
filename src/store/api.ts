@@ -49,14 +49,29 @@ export const api = {
   daftar: (body: { username: string; password: string }) =>
     panggil<{ token: string; user: User }>('POST', '/api/auth/register', body),
   saya: () => panggil<{ user: User }>('GET', '/api/auth/me'),
+  /** Memeriksa apakah host mendukung WebSocket (dari /api/health). */
+  info: () => panggil<{ ok: boolean; ws: boolean }>('GET', '/api/health'),
   ruang: () => panggil<{ rooms: Room[] }>('GET', '/api/rooms'),
   riwayat: (slug: string, limit = 50) =>
     panggil<{ room: { id: number; slug: string; name: string }; messages: ChatMessage[] }>(
       'GET', `/api/rooms/${slug}/messages?limit=${limit}`,
     ),
+
+  // Mode cadangan (polling) — dipakai bila WebSocket tidak tersedia.
+  poll: (slug: string, since: number) =>
+    panggil<{ messages: ChatMessage[]; online: string[]; typing: string[] }>(
+      'GET', `/api/rooms/${slug}/poll?since=${since}`,
+    ),
+  kirimLewatRest: (slug: string, body: string) =>
+    panggil<{ message: ChatMessage }>('POST', `/api/rooms/${slug}/messages`, { body }),
+  kabariMenulisRest: (slug: string) =>
+    panggil<{ ok: boolean }>('POST', `/api/rooms/${slug}/typing`, {}),
 }
 
-/** Alamat WebSocket, mengikuti asal halaman (ws:// atau wss://). */
+/**
+ * Alamat WebSocket, mengikuti asal halaman (ws:// atau wss://).
+ * (Mode dipilih dari /api/health; WebSocket hanya dibuka bila host mendukung.)
+ */
 export function alamatWs(token: string): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${proto}//${location.host}/ws?token=${encodeURIComponent(token)}`

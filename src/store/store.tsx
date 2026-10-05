@@ -1,10 +1,14 @@
 /**
- * Keadaan global Ngobrol: sesi pengguna, daftar ruang, dan koneksi real-time.
+ * Keadaan global Ngobrol: sesi pengguna, daftar ruang, dan pengiriman real-time.
  *
- * Koneksi WebSocket dikelola di satu tempat. Saat ruang berganti, klien
- * mengirim {"tipe":"gabung"} dan server mengirim riwayat + daftar online.
- * Pesan yang masuk lewat soket langsung ditambahkan ke daftar (tanpa duplikat,
- * karena pengirim juga menerima gemanya sendiri dari server).
+ * DUA MODE, dipilih otomatis saat masuk:
+ *   - "ws"   → WebSocket (sungguhan). Dipakai bila host mendukung (mis. Render).
+ *   - "poll" → cadangan: meminta pesan baru tiap ~1,5 detik. Dipakai bila
+ *              WebSocket tidak tersedia (mis. Vercel, yang serverless).
+ *
+ * Keduanya memberi hasil yang sama bagi pengguna: pesan muncul tanpa refresh,
+ * ada daftar online, dan indikator "sedang menulis". Bedanya hanya kecepatan
+ * dan cara kerjanya di balik layar.
  */
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
@@ -16,11 +20,15 @@ import {
 } from './api'
 import { gabungPesan } from './format'
 
-/** Keadaan koneksi soket. */
+/** Keadaan koneksi. */
 export type StatusKoneksi = 'menyambung' | 'hidup' | 'mati'
+/** Cara real-time yang sedang dipakai. */
+export type ModeKoneksi = 'ws' | 'poll' | null
 
 /** Kunci localStorage untuk mengingat ruang terakhir yang dibuka. */
 const KUNCI_RUANG = 'ngobrol_ruang'
+/** Jeda antar-permintaan pada mode cadangan (ms). */
+const JEDA_POLL = 1500
 
 interface Keadaan {
   user: User | null
@@ -31,6 +39,7 @@ interface Keadaan {
   online: string[]
   menulis: string[]
   status: StatusKoneksi
+  mode: ModeKoneksi
   galat: string | null
 
   masuk: (username: string, password: string) => Promise<void>
@@ -53,13 +62,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [online, setOnline] = useState<string[]>([])
   const [menulis, setMenulis] = useState<string[]>([])
   const [status, setStatus] = useState<StatusKoneksi>('menyambung')
+  const [mode, setMode] = useState<ModeKoneksi>(null)
   const [galat, setGalat] = useState<string | null>(null)
 
-  // Soket disimpan di ref agar tidak memicu render ulang.
+  // Semua yang berubah tanpa memicu render ulang disimpan di ref.
   const soketRef = useRef<WebSocket | null>(null)
   const ruangRef = useRef<string | null>(null)
+  const modeRef = useRef<ModeKoneksi>(null)
   const sambungUlangRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sengajaTutupRef = useRef(false)
+  const sejakRef = useRef(0)          // id pesan terakhir (mode cadangan)
+  const hidupRef = useRef(true)       // penanda komponen masih terpasang
 
   // Pulihkan sesi saat aplikasi dimuat.
   useEffect(() => {
@@ -85,8 +99,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const { rooms: r } = await api.ruang()
         setRooms(r)
-        // Pilih ruang terakhir yang dibuka (tersimpan di localStorage), atau
-        // ruang pertama bila belum pernah memilih.
         if (r.length && !ruangRef.current) {
           const tersimpan = localStorage.getItem(KUNCI_RUANG)
           const pilih = tersimpan && r.some(x => x.slug === tersimpan) ? tersimpan : r[0].slug
@@ -98,6 +110,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  // ── Mode WebSocket ────────────────────────────────────────────────────────
 
   /** Membuka koneksi WebSocket dan memasang penangan pesan. */
   const sambung = useCallback(() => {
@@ -113,7 +127,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     ws.onopen = () => {
       setStatus('hidup')
-      // Bila sudah ada ruang terpilih, langsung gabung lagi (mis. setelah putus).
+      setMode('ws')
+      modeRef.current = 'ws'
+      // Bila sudah ada ruang terpilih, langsung gabung (mis. setelah putus).
       if (ruangRef.current) ws.send(JSON.stringify({ tipe: 'gabung', room: ruangRef.current }))
     }
 
@@ -127,7 +143,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           break
         case 'pesan':
           setPesan(lama => gabungPesan(lama, [m.pesan]))
-          // Pesan masuk dari orang lain berarti ia berhenti menulis.
           setMenulis(lama => lama.filter(n => n !== m.pesan.username))
           break
         case 'online':
@@ -147,8 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     ws.onclose = () => {
       setStatus('mati')
-      // Sambung ulang otomatis kecuali memang sengaja ditutup.
-      if (!sengajaTutupRef.current) {
+      if (!sengajaTutupRef.current && hidupRef.current) {
         sambungUlangRef.current = setTimeout(() => sambung(), 1500)
       }
     }
@@ -156,46 +170,152 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ws.onerror = () => { /* onclose akan menangani */ }
   }, [])
 
-  // Buka soket saat pengguna masuk; tutup saat keluar.
+  // ── Mode cadangan (polling) ───────────────────────────────────────────────
+
+  /** Satu putaran polling: ambil pesan baru + daftar online & menulis. */
+  const satuPutaranPoll = useCallback(async () => {
+    const slug = ruangRef.current
+    if (!slug) return
+    try {
+      const { messages, online: on, typing } = await api.poll(slug, sejakRef.current)
+      if (messages.length) {
+        sejakRef.current = Math.max(sejakRef.current, ...messages.map(m => m.id))
+        setPesan(lama => gabungPesan(lama, messages))
+      }
+      setOnline(on)
+      setMenulis(typing)
+      setStatus('hidup')
+    } catch (e) {
+      setStatus('mati')
+      // Galat 401 = sesi habis; jangan berputar terus.
+      if (e instanceof GalatApi && e.status === 401) return
+    }
+  }, [])
+
+  /** Menjalankan polling berulang selama komponen masih hidup. */
+  const mulaiPolling = useCallback(() => {
+    const putar = async () => {
+      if (!hidupRef.current || modeRef.current !== 'poll') return
+      await satuPutaranPoll()
+      if (!hidupRef.current || modeRef.current !== 'poll') return
+      pollTimerRef.current = setTimeout(putar, JEDA_POLL)
+    }
+    void putar()
+  }, [satuPutaranPoll])
+
+  // Saat pengguna masuk: coba WebSocket dulu; bila gagal, pakai polling.
   useEffect(() => {
     if (!user) return
-    sambung()
+    hidupRef.current = true
+    const token = ambilToken()
+    if (!token) return
+
+    let batal = false
+    ;(async () => {
+      // Tanyakan dulu apakah host mendukung WebSocket. Bila ya, pakai WebSocket;
+      // bila tidak, langsung mode cadangan — tanpa mencoba menyambung lebih dulu
+      // (agar tidak muncul error di konsol browser).
+      let wsBisa = false
+      try {
+        const info = await api.info()
+        wsBisa = info.ws === true
+      } catch {
+        wsBisa = false
+      }
+      if (batal) return
+      if (wsBisa) {
+        modeRef.current = 'ws'
+        sambung()
+      } else {
+        // WebSocket tidak tersedia → mode cadangan.
+        modeRef.current = 'poll'
+        setMode('poll')
+        setStatus('menyambung')
+        mulaiPolling()
+      }
+    })()
+
     return () => {
+      batal = true
+      hidupRef.current = false
       sengajaTutupRef.current = true
       if (sambungUlangRef.current) clearTimeout(sambungUlangRef.current)
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
       soketRef.current?.close()
       soketRef.current = null
+      modeRef.current = null
     }
-  }, [user?.id, sambung])
+  }, [user?.id, sambung, mulaiPolling])
 
-  /** Berpindah ruang: beri tahu server, lalu bersihkan tampilan. */
+  // ── Aksi ──────────────────────────────────────────────────────────────────
+
+  /** Berpindah ruang: bersihkan tampilan, lalu bergabung dengan cara sesuai mode. */
   const pilihRuang = useCallback((slug: string) => {
     ruangRef.current = slug
     setRuangAktif(slug)
     setPesan([])
     setMenulis([])
-    // Ingat pilihan agar setelah muat ulang tetap di ruang yang sama.
+    setOnline([])
+    sejakRef.current = 0
     try { localStorage.setItem(KUNCI_RUANG, slug) } catch { /* mode privat */ }
-    const ws = soketRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ tipe: 'gabung', room: slug }))
-    }
-  }, [])
 
-  /** Mengirim pesan lewat soket. */
+    if (modeRef.current === 'ws') {
+      const ws = soketRef.current
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ tipe: 'gabung', room: slug }))
+      }
+    } else if (modeRef.current === 'poll') {
+      // Muat riwayat lebih dulu, lalu lanjutkan polling dari pesan terakhir.
+      void (async () => {
+        try {
+          const { messages } = await api.riwayat(slug, 50)
+          if (ruangRef.current !== slug) return
+          setPesan(messages)
+          sejakRef.current = messages.length ? Math.max(...messages.map(m => m.id)) : 0
+          void satuPutaranPoll()
+        } catch (e) {
+          setGalat(pesanGalat(e))
+        }
+      })()
+    }
+  }, [satuPutaranPoll])
+
+  /** Mengirim pesan (lewat soket atau REST, sesuai mode). */
   const kirimPesan = useCallback((body: string) => {
-    const ws = soketRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setGalat('Belum tersambung ke server. Coba sebentar lagi.')
+    const slug = ruangRef.current
+    if (!slug) return
+
+    if (modeRef.current === 'ws') {
+      const ws = soketRef.current
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        setGalat('Belum tersambung ke server. Coba sebentar lagi.')
+        return
+      }
+      ws.send(JSON.stringify({ tipe: 'pesan', body }))
       return
     }
-    ws.send(JSON.stringify({ tipe: 'pesan', body }))
-  }, [])
+
+    // Mode cadangan: kirim lewat REST, lalu langsung ambil pembaruan.
+    void (async () => {
+      try {
+        await api.kirimLewatRest(slug, body)
+        await satuPutaranPoll()
+      } catch (e) {
+        setGalat(pesanGalat(e))
+      }
+    })()
+  }, [satuPutaranPoll])
 
   /** Memberi tahu server bahwa pengguna sedang menulis. */
   const kabariMenulis = useCallback(() => {
-    const ws = soketRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ tipe: 'menulis' }))
+    const slug = ruangRef.current
+    if (!slug) return
+    if (modeRef.current === 'ws') {
+      const ws = soketRef.current
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ tipe: 'menulis' }))
+    } else if (modeRef.current === 'poll') {
+      void api.kabariMenulisRest(slug).catch(() => { /* abaikan */ })
+    }
   }, [])
 
   const masuk = useCallback(async (username: string, password: string) => {
@@ -211,9 +331,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const keluar = useCallback(() => {
+    hidupRef.current = false
     sengajaTutupRef.current = true
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     soketRef.current?.close()
     soketRef.current = null
+    modeRef.current = null
     ruangRef.current = null
     simpanToken(null)
     setUser(null)
@@ -221,14 +344,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setPesan([])
     setOnline([])
     setMenulis([])
+    setMode(null)
   }, [])
 
   const nilai = useMemo<Keadaan>(() => ({
-    user, siap, rooms, ruangAktif, pesan, online, menulis, status, galat,
+    user, siap, rooms, ruangAktif, pesan, online, menulis, status, mode, galat,
     masuk, daftar, keluar, pilihRuang, kirimPesan, kabariMenulis,
     bersihkanGalat: () => setGalat(null),
   }), [
-    user, siap, rooms, ruangAktif, pesan, online, menulis, status, galat,
+    user, siap, rooms, ruangAktif, pesan, online, menulis, status, mode, galat,
     masuk, daftar, keluar, pilihRuang, kirimPesan, kabariMenulis,
   ])
 

@@ -6,7 +6,7 @@ import { Avatar, StatusTitik, TitikMenulis } from '../components/ui'
 import type { ChatMessage } from '../store/api'
 
 export function RuangObrolan({ bukaSidebar }: { bukaSidebar: () => void }) {
-  const { rooms, ruangAktif, pesan, online, menulis, status, user, kirimPesan, kabariMenulis } = useStore()
+  const { rooms, ruangAktif, pesan, online, menulis, status, mode, user, kirimPesan, kabariMenulis } = useStore()
   const [teks, setTeks] = useState('')
   const [nempelBawah, setNempelBawah] = useState(true)
   const isiRef = useRef<HTMLDivElement>(null)
@@ -77,7 +77,10 @@ export function RuangObrolan({ bukaSidebar }: { bukaSidebar: () => void }) {
         <button className="buka-sidebar" onClick={bukaSidebar} aria-label="Buka daftar ruang">☰</button>
         <div style={{ flex: 1 }}>
           <h2># {ruang?.name ?? '—'}</h2>
-          <div className="ket">{ruang?.description ?? ''}</div>
+          <div className="ket">
+            {ruang?.description ?? ''}
+            {mode === 'poll' && <span title="Host tidak mendukung WebSocket, jadi memakai mode cadangan."> · mode cadangan</span>}
+          </div>
         </div>
         <StatusTitik status={status} />
       </header>
