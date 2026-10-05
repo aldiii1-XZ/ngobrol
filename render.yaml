@@ -16,7 +16,9 @@ services:
     startCommand: node server/src/index.js
     healthCheckPath: /api/health
     envVars:
+      # node:sqlite (DatabaseSync) bebas-flag sejak Node 22.13.0, jadi versi
+      # harus >= 22.13.0. Jangan turunkan ke bawah itu.
       - key: NODE_VERSION
-        value: "22.11.0"
+        value: "22.16.0"
       - key: AUTH_SECRET
         generateValue: true
